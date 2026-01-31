@@ -1,189 +1,164 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Study Room</title>
-
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-
-<style>
-:root {
-  --bg:#0e0e0e;--card:#181818;--border:#2a2a2a;
-  --orange:#ff9f1a;--dim:#444;--text:#eaeaea;
-}
-*{box-sizing:border-box;font-family:Inter,sans-serif}
-body{margin:0;background:var(--bg);color:var(--text);
-display:flex;flex-direction:column;align-items:center;min-height:100vh}
-h1{margin:30px 0 10px}
-.join{margin:20px}
-input{background:var(--card);border:1px solid var(--border);
-color:var(--text);padding:10px 14px;border-radius:8px;margin:5px}
-button{background:var(--orange);border:none;color:black;
-padding:10px 16px;border-radius:8px;font-weight:600;cursor:pointer;margin:5px}
-button.secondary{background:transparent;color:var(--text);
-border:1px solid var(--border)}
-.room{display:none;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
-gap:20px;width:min(800px,100%);padding:20px}
-.card{background:var(--card);border-radius:14px;padding:20px;
-border:1px solid var(--border)}
-.card.study{border-color:var(--orange);box-shadow:0 0 20px #ff9f1a33}
-.name{font-size:18px;font-weight:600}
-.status{font-size:14px;color:var(--dim)}
-.study .status{color:var(--orange)}
-.time{font-size:32px;font-weight:700;margin:10px 0}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bishir & Sanjay Study</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #0e0e0e; --card: #181818; --border: #2a2a2a; --primary: #1abc9c; --text: #eaeaea; --dim: #888; --red: #e74c3c; }
+        body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .container { width: 95%; max-width: 800px; margin-top: 40px; }
+        h1 { text-align: center; margin-bottom: 30px; font-weight: 700; }
+        #identity-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
+        .identity-btn { background: var(--card); border: 1px solid var(--primary); color: var(--primary); font-size: 20px; padding: 15px 40px; margin: 10px; border-radius: 8px; cursor: pointer; width: 220px; transition: 0.2s; font-weight: 600; }
+        .identity-btn:hover { background: var(--primary); color: #000; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 40px; }
+        @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 25px; text-align: center; transition: 0.3s; }
+        .card.studying { border-color: var(--primary); box-shadow: 0 0 25px rgba(26, 188, 156, 0.15); }
+        .name { font-size: 1.3rem; font-weight: 700; margin-bottom: 5px; }
+        .status-badge { display: inline-block; font-size: 0.8rem; padding: 4px 12px; border-radius: 20px; background: #222; color: var(--dim); margin-bottom: 20px; }
+        .card.studying .status-badge { background: rgba(26, 188, 156, 0.2); color: var(--primary); }
+        .timer-display { font-size: 3rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .max-display { font-size: 0.85rem; color: var(--dim); margin-top: 10px; }
+        .controls { margin-top: 25px; display: flex; gap: 10px; justify-content: center; }
+        button.action { padding: 10px 18px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn-start { background: var(--primary); color: #000; }
+        .btn-pause { background: transparent; border: 1px solid var(--dim); color: var(--text); }
+        .btn-reset { background: transparent; border: 1px solid var(--red); color: var(--red); opacity: 0.6; }
+        .history-section { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 50px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #2a2a2a; }
+        th { color: var(--dim); font-size: 0.8rem; text-transform: uppercase; }
+    </style>
 </head>
-
 <body>
 
-<h1>📚 Study Room</h1>
-
-<!-- STEP 1 -->
-<div class="join" id="modeDiv">
-  <button onclick="chooseMode('create')">Create Room</button>
-  <button onclick="chooseMode('join')">Join Room</button>
+<div id="identity-overlay">
+    <h2 style="margin-bottom:30px">Select Your Profile</h2>
+    <button class="identity-btn" onclick="setIdentity('Bishir')">Bishir</button>
+    <button class="identity-btn" onclick="setIdentity('Sanjay')">Sanjay</button>
 </div>
 
-<!-- STEP 2 -->
-<div class="join" id="joinDiv" style="display:none">
-  <input id="roomInput" placeholder="Room code">
-  <input id="nameInput" placeholder="Your name">
-  <button onclick="enterRoom()">Enter</button>
+<div class="container">
+    <h1>📚 Study Sync</h1>
+    <div class="grid">
+        <div id="card-Bishir" class="card">
+            <div class="name">Bishir</div>
+            <div class="status-badge" id="status-Bishir">Offline</div>
+            <div class="timer-display" id="timer-Bishir">00:00:00</div>
+            <div class="max-display">Max Session: <span id="max-Bishir">00:00:00</span></div>
+            <div id="controls-Bishir" class="controls" style="display:none">
+                <button class="action btn-start" onclick="handleStart()">Start</button>
+                <button class="action btn-pause" onclick="handlePause()">Pause</button>
+                <button class="action btn-reset" onclick="handleReset()">Reset</button>
+            </div>
+        </div>
+        <div id="card-Sanjay" class="card">
+            <div class="name">Sanjay</div>
+            <div class="status-badge" id="status-Sanjay">Offline</div>
+            <div class="timer-display" id="timer-Sanjay">00:00:00</div>
+            <div class="max-display">Max Session: <span id="max-Sanjay">00:00:00</span></div>
+            <div id="controls-Sanjay" class="controls" style="display:none">
+                <button class="action btn-start" onclick="handleStart()">Start</button>
+                <button class="action btn-pause" onclick="handlePause()">Pause</button>
+                <button class="action btn-reset" onclick="handleReset()">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="history-section">
+        <h3 style="margin:0">📅 History (Last 5 Days)</h3>
+        <table id="history-table">
+            <thead><tr><th>Date</th><th>Bishir</th><th>Sanjay</th></tr></thead>
+            <tbody id="history-body"></tbody>
+        </table>
+    </div>
 </div>
 
-<!-- STEP 3 -->
-<div class="room" id="roomDiv">
-  <div id="me" class="card"></div>
-  <div id="other" class="card"></div>
-</div>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyClPw0EhUdUR4lJyWYngwdcc8EcdMNrb0c",
+        authDomain: "studytracker-92a0f.firebaseapp.com",
+        databaseURL: "https://studytracker-92a0f-default-rtdb.firebaseio.com",
+        projectId: "studytracker-92a0f",
+        storageBucket: "studytracker-92a0f.firebasestorage.app",
+        messagingSenderId: "925914064669",
+        appId: "1:925914064669:web:87a68867f5fc17b5db23f4"
+    };
 
-<script>
-const firebaseConfig={
- apiKey:"AIzaSyDtldC_Jkba7d-FNoLRJfM7aJSdu0QPMpA",
- authDomain:"study-room-b3934.firebaseapp.com",
- databaseURL:"https://study-room-b3934-default-rtdb.firebaseio.com",
- projectId:"study-room-b3934"
-};
-firebase.initializeApp(firebaseConfig);
-firebase.auth().signInAnonymously();
-const db=firebase.database();
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-let uid=null,mode="",roomCode="",mySlot="",myName="";
-let status="break",startTime=0,total=0,maxSession=0,timer=null;
+    let myName = localStorage.getItem('studyUser');
+    let appState = { Bishir: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0 }, Sanjay: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0 }, todayDate: new Date().toLocaleDateString('en-CA') };
 
-firebase.auth().onAuthStateChanged(u=>uid=u.uid);
+    if(myName) { document.getElementById('identity-overlay').style.display = 'none'; showControls(); }
+    window.setIdentity = (name) => { myName = name; localStorage.setItem('studyUser', name); document.getElementById('identity-overlay').style.display = 'none'; showControls(); };
+    function showControls() { document.getElementById(`controls-${myName}`).style.display = 'flex'; }
 
-function chooseMode(m){
- mode=m;
- modeDiv.style.display="none";
- joinDiv.style.display="block";
-}
+    onValue(ref(db, 'stats'), (snap) => {
+        const data = snap.val();
+        if(data) {
+            const today = new Date().toLocaleDateString('en-CA');
+            if(data.todayDate && data.todayDate !== today) { runMidnightReset(data, today); } 
+            else { appState = data; renderStatic(); }
+        } else { update(ref(db, 'stats'), appState); }
+    });
 
-function enterRoom(){
- roomCode=roomInput.value.trim();
- myName=nameInput.value.trim();
- if(!roomCode||!myName) return alert("Fill all fields");
+    onValue(ref(db, 'history'), (snap) => {
+        const hBody = document.getElementById('history-body');
+        hBody.innerHTML = '';
+        const history = snap.val();
+        if(!history) return;
+        Object.values(history).sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0,5).forEach(row => {
+            hBody.innerHTML += `<tr><td>${row.date}</td><td>${row.Bishir}</td><td>${row.Sanjay}</td></tr>`;
+        });
+    });
 
- const roomRef=db.ref("rooms/"+roomCode);
- roomRef.once("value").then(s=>{
-  const r=s.val();
+    window.handleStart = () => update(ref(db, `stats/${myName}`), { status: 'studying', startTime: Date.now() });
+    window.handlePause = () => {
+        const s = appState[myName];
+        if(s.status !== 'studying') return;
+        const session = Math.floor((Date.now() - s.startTime) / 1000);
+        update(ref(db, `stats/${myName}`), { status: 'break', totalToday: s.totalToday + session, maxSession: Math.max(s.maxSession, session), startTime: 0 });
+    };
+    window.handleReset = () => { if(confirm("Reset today's time?")) update(ref(db, `stats/${myName}`), { totalToday: 0, startTime: 0, status: 'break' }); };
 
-  if(mode==="join" && !r) return alert("Room does not exist");
+    function runMidnightReset(oldData, newDate) {
+        const updates = {};
+        updates[`history/${oldData.todayDate}`] = { date: oldData.todayDate, Bishir: fmt(oldData.Bishir.totalToday), Sanjay: fmt(oldData.Sanjay.totalToday) };
+        updates[`stats`] = { todayDate: newDate, Bishir: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0 }, Sanjay: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0 } };
+        update(ref(db), updates);
+    }
 
-  if(!r) roomRef.set({});
+    function renderStatic() {
+        ['Bishir', 'Sanjay'].forEach(u => {
+            const card = document.getElementById(`card-${u}`);
+            const status = document.getElementById(`status-${u}`);
+            const max = document.getElementById(`max-${u}`);
+            card.className = `card ${appState[u].status === 'studying' ? 'studying' : ''}`;
+            status.innerText = appState[u].status === 'studying' ? 'Studying' : 'On Break';
+            max.innerText = fmt(appState[u].maxSession);
+        });
+    }
 
-  if(!r?.slot1) mySlot="slot1";
-  else if(!r?.slot2) mySlot="slot2";
-  else return alert("Room full");
+    setInterval(() => {
+        ['Bishir', 'Sanjay'].forEach(u => {
+            let t = appState[u].totalToday;
+            if(appState[u].status === 'studying') t += Math.floor((Date.now() - appState[u].startTime) / 1000);
+            document.getElementById(`timer-${u}`).innerText = fmt(t);
+        });
+    }, 1000);
 
-  const ref=roomRef.child(mySlot);
-  ref.set({uid,name:myName,status,total,maxSession});
-  ref.onDisconnect().remove();
-
-  joinDiv.style.display="none";
-  roomDiv.style.display="grid";
-  listen();
-  render();
- });
-}
-
-function startStudy(){
- if(status==="study")return;
- status="study";startTime=Date.now();
- timer=setInterval(update,1000);
-}
-
-function pauseStudy(){
- if(status==="break")return;
- const s=Math.floor((Date.now()-startTime)/1000);
- total+=s;maxSession=Math.max(maxSession,s);
- status="break";clearInterval(timer);sync();
-}
-
-function resetMe(){
- total=0;maxSession=0;
- status="break";clearInterval(timer);sync();
-}
-
-function exitRoom(){
- db.ref(`rooms/${roomCode}/${mySlot}`).remove();
- location.reload();
-}
-
-function update(){
- const live=total+Math.floor((Date.now()-startTime)/1000);
- db.ref(`rooms/${roomCode}/${mySlot}`).update({status,total:live,maxSession});
- render(live);
-}
-
-function sync(){
- db.ref(`rooms/${roomCode}/${mySlot}`).update({status,total,maxSession});
- render();
-}
-
-function listen(){
- db.ref("rooms/"+roomCode).on("value",s=>{
-  const r=s.val()||{};
-  const otherSlot=mySlot==="slot1"?"slot2":"slot1";
-  showOther(r[otherSlot]);
- });
-}
-
-function showOther(d){
- if(!d){other.innerHTML="";return;}
- other.className="card "+(d.status==="study"?"study":"");
- other.innerHTML=`
-  <div class="name">${d.name}</div>
-  <div class="status">${d.status==="study"?"Studying":"On break"}</div>
-  <div class="time">${fmt(d.total)}</div>
-  <div class="meta">Max session: ${fmt(d.maxSession)}</div>`;
-}
-
-function render(live=null){
- const t=live??total;
- me.className="card "+(status==="study"?"study":"");
- me.innerHTML=`
-  <div class="name">${myName} (You)</div>
-  <div class="status">${status==="study"?"Studying":"On break"}</div>
-  <div class="time">${fmt(t)}</div>
-  <div class="meta">Max session: ${fmt(maxSession)}</div>
-  <button onclick="startStudy()">Start</button>
-  <button onclick="pauseStudy()" class="secondary">Pause</button>
-  <button onclick="resetMe()" class="secondary">Reset</button>
-  <button onclick="exitRoom()" class="secondary">Exit</button>`;
-}
-
-function fmt(s){
- const h=Math.floor(s/3600);
- const m=Math.floor((s%3600)/60);
- const sec=s%60;
- return `${h}h ${m}m ${sec}s`;
-}
+    function fmt(s) {
+        const h = Math.floor(s/3600); const m = Math.floor((s%3600)/60); const sec = s%60;
+        return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    }
 </script>
-
 </body>
 </html>
