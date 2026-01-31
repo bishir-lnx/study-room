@@ -6,7 +6,7 @@
     <title>Bishir & Sanjay Study</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        :root { --bg: #0e0e0e; --card: #181818; --border: #2a2a2a; --primary: #1abc9c; --text: #eaeaea; --dim: #888; --red: #e74c3c; }
+        :root { --bg: #0e0e0e; --card: #181818; --border: #2a2a2a; --primary: #1abc9c; --text: #eaeaea; --dim: #888; --red: #e74c3c; --accent: #3498db; }
         body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
         .container { width: 95%; max-width: 800px; margin-top: 40px; }
         h1 { text-align: center; margin-bottom: 30px; font-weight: 700; }
@@ -15,13 +15,17 @@
         .identity-btn:hover { background: var(--primary); color: #000; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 40px; }
         @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
-        .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 25px; text-align: center; transition: 0.3s; position: relative; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 25px; text-align: center; transition: 0.3s; position: relative; overflow: hidden; }
         .card.studying { border-color: var(--primary); box-shadow: 0 0 25px rgba(26, 188, 156, 0.15); }
         .name { font-size: 1.3rem; font-weight: 700; margin-bottom: 5px; }
         .status-badge { display: inline-block; font-size: 0.8rem; padding: 4px 12px; border-radius: 20px; background: #222; color: var(--dim); margin-bottom: 20px; }
         .card.studying .status-badge { background: rgba(26, 188, 156, 0.2); color: var(--primary); }
         .timer-display { font-size: 3rem; font-weight: 700; font-variant-numeric: tabular-nums; }
         .max-display { font-size: 0.85rem; color: var(--dim); margin-top: 10px; }
+        
+        /* Break Message Style */
+        .break-msg { font-size: 0.8rem; color: var(--accent); background: rgba(52, 152, 219, 0.1); border: 1px solid rgba(52, 152, 219, 0.2); padding: 6px 12px; border-radius: 8px; margin-top: 15px; display: none; transition: 0.3s; }
+
         .controls { margin-top: 25px; display: flex; gap: 10px; justify-content: center; }
         button.action { padding: 10px 18px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; min-width: 100px; }
         .btn-toggle { background: var(--primary); color: #000; }
@@ -46,9 +50,10 @@
     <div class="grid">
         <div id="card-Bishir" class="card">
             <div class="name">Bishir</div>
-            <div class="status-badge" id="status-Bishir">Offline</div>
-            <div class="timer-display" id="timer-Bishir">00:00:00</div>
+            <div id="status-Bishir" class="status-badge">Offline</div>
+            <div id="timer-Bishir" class="timer-display">00:00:00</div>
             <div class="max-display">Max Session: <span id="max-Bishir">00:00:00</span></div>
+            <div id="msg-Bishir" class="break-msg"></div>
             <div id="controls-Bishir" class="controls" style="display:none">
                 <button id="toggle-Bishir" class="action btn-toggle" onclick="handleToggle()">Start</button>
                 <button class="action btn-reset" onclick="handleReset()">Reset</button>
@@ -56,9 +61,10 @@
         </div>
         <div id="card-Sanjay" class="card">
             <div class="name">Sanjay</div>
-            <div class="status-badge" id="status-Sanjay">Offline</div>
-            <div class="timer-display" id="timer-Sanjay">00:00:00</div>
+            <div id="status-Sanjay" class="status-badge">Offline</div>
+            <div id="timer-Sanjay" class="timer-display">00:00:00</div>
             <div class="max-display">Max Session: <span id="max-Sanjay">00:00:00</span></div>
+            <div id="msg-Sanjay" class="break-msg"></div>
             <div id="controls-Sanjay" class="controls" style="display:none">
                 <button id="toggle-Sanjay" class="action btn-toggle" onclick="handleToggle()">Start</button>
                 <button class="action btn-reset" onclick="handleReset()">Reset</button>
@@ -93,7 +99,11 @@
     const db = getDatabase(app);
 
     let myName = localStorage.getItem('studyUser');
-    let appState = { Bishir: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0 }, Sanjay: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0 }, todayDate: new Date().toLocaleDateString('en-CA') };
+    let appState = { 
+        Bishir: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" }, 
+        Sanjay: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" }, 
+        todayDate: new Date().toLocaleDateString('en-CA') 
+    };
 
     if(myName) { document.getElementById('identity-overlay').style.display = 'none'; showControls(); }
     
@@ -109,15 +119,8 @@
         if(ctrl) ctrl.style.display = 'flex'; 
     }
 
-    // --- AUTO-PAUSE LOGIC FOR MOBILE/TABLET ---
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "hidden" && appState[myName].status === 'studying') {
-            window.handleToggle();
-        }
-    });
-
-    window.addEventListener("pagehide", () => {
-        if (appState[myName].status === 'studying') {
             window.handleToggle();
         }
     });
@@ -142,7 +145,6 @@
         hBody.innerHTML = '';
         const history = snap.val();
         if(!history) return;
-        // Sorts descending and renders whatever is in DB (DB is pruned to 5 in Reset function)
         Object.values(history).sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(row => {
             hBody.innerHTML += `<tr><td>${row.date}</td><td>${row.Bishir}</td><td>${row.Sanjay}</td></tr>`;
         });
@@ -150,61 +152,61 @@
 
     window.handleToggle = () => {
         const s = appState[myName];
+        // Fixed: Use hour12: true for AM/PM format
+        const nowTime = new Date().toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit', 
+            hour12: true 
+        });
+        
         if (s.status === 'studying') {
             const session = Math.floor((Date.now() - s.startTime) / 1000);
             update(ref(db, `stats/${myName}`), { 
                 status: 'break', 
                 totalToday: (s.totalToday || 0) + session, 
                 maxSession: Math.max((s.maxSession || 0), session), 
-                startTime: 0 
+                startTime: 0,
+                lastBreakAt: `Took break at ${nowTime}`
             });
         } else {
             update(ref(db, `stats/${myName}`), { 
                 status: 'studying', 
-                startTime: Date.now() 
+                startTime: Date.now(),
+                lastBreakAt: "" 
             });
         }
     };
 
     window.handleReset = () => { 
         if(confirm("Reset today's time?")) {
-            update(ref(db, `stats/${myName}`), { totalToday: 0, startTime: 0, status: 'break', maxSession: 0 }); 
+            update(ref(db, `stats/${myName}`), { totalToday: 0, startTime: 0, status: 'break', maxSession: 0, lastBreakAt: "" }); 
         }
     };
 
-    // --- PRUNING MIDNIGHT RESET ---
     async function runMidnightReset(oldData, newDate) {
         const historyRef = ref(db, 'history');
         const snapshot = await get(historyRef);
         let historyEntries = snapshot.exists() ? Object.values(snapshot.val()) : [];
-
-        // Add latest entry
-        historyEntries.push({ 
-            date: oldData.todayDate, 
-            Bishir: fmt(oldData.Bishir.totalToday), 
-            Sanjay: fmt(oldData.Sanjay.totalToday) 
-        });
-
-        // Sort by date newest first and slice to 5
+        historyEntries.push({ date: oldData.todayDate, Bishir: fmt(oldData.Bishir.totalToday), Sanjay: fmt(oldData.Sanjay.totalToday) });
         historyEntries.sort((a,b) => new Date(b.date) - new Date(a.date));
         const prunedHistory = {};
         historyEntries.slice(0, 5).forEach(e => { prunedHistory[e.date] = e; });
 
-        const updates = {};
-        updates['history'] = prunedHistory; // Overwrites the whole history folder with only 5 items
-        updates['stats'] = { 
-            todayDate: newDate, 
-            Bishir: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0 }, 
-            Sanjay: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0 } 
-        };
-        update(ref(db), updates);
+        update(ref(db), {
+            'history': prunedHistory,
+            'stats': { 
+                todayDate: newDate, 
+                Bishir: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" }, 
+                Sanjay: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" } 
+            }
+        });
     }
 
     function renderStatic() {
         ['Bishir', 'Sanjay'].forEach(u => {
             const card = document.getElementById(`card-${u}`);
             const status = document.getElementById(`status-${u}`);
-            const max = document.getElementById(`max-${u}`);
+            const msgEl = document.getElementById(`msg-${u}`);
             const toggleBtn = document.getElementById(`toggle-${u}`);
             
             const data = appState[u];
@@ -212,16 +214,18 @@
 
             card.className = `card ${isStudying ? 'studying' : ''}`;
             status.innerText = isStudying ? 'Studying' : 'On Break';
-            max.innerText = fmt(data.maxSession || 0);
+            document.getElementById(`max-${u}`).innerText = fmt(data.maxSession || 0);
+
+            if (data.lastBreakAt && !isStudying) {
+                msgEl.innerText = data.lastBreakAt;
+                msgEl.style.display = 'inline-block';
+            } else {
+                msgEl.style.display = 'none';
+            }
 
             if(u === myName && toggleBtn) {
-                if(isStudying) {
-                    toggleBtn.innerText = "Pause";
-                    toggleBtn.classList.add('btn-pause-mode');
-                } else {
-                    toggleBtn.innerText = (data.totalToday > 0) ? "Resume" : "Start";
-                    toggleBtn.classList.remove('btn-pause-mode');
-                }
+                toggleBtn.innerText = isStudying ? "Pause" : (data.totalToday > 0 ? "Resume" : "Start");
+                isStudying ? toggleBtn.classList.add('btn-pause-mode') : toggleBtn.classList.remove('btn-pause-mode');
             }
         });
     }
@@ -232,8 +236,8 @@
             if(appState[u].status === 'studying' && appState[u].startTime) {
                 t += Math.floor((Date.now() - appState[u].startTime) / 1000);
             }
-            const timerEl = document.getElementById(`timer-${u}`);
-            if(timerEl) timerEl.innerText = fmt(t);
+            const el = document.getElementById(`timer-${u}`);
+            if(el) el.innerText = fmt(t);
         });
     }, 1000);
 
