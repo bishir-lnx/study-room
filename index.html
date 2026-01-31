@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <title>Study Room</title>
 
-<!-- Google Font -->
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
 <style>
@@ -34,7 +33,6 @@ body {
 
 h1 {
   margin: 30px 0 10px;
-  font-weight: 700;
 }
 
 .join {
@@ -47,7 +45,6 @@ input {
   color: var(--text);
   padding: 10px 14px;
   border-radius: 8px;
-  font-size: 16px;
 }
 
 button {
@@ -79,7 +76,6 @@ button.secondary {
   border-radius: 14px;
   padding: 20px;
   border: 1px solid var(--border);
-  transition: 0.3s;
 }
 
 .card.study {
@@ -90,12 +86,10 @@ button.secondary {
 .name {
   font-size: 18px;
   font-weight: 600;
-  margin-bottom: 10px;
 }
 
 .status {
   font-size: 14px;
-  margin-bottom: 12px;
   color: var(--dim);
 }
 
@@ -107,17 +101,6 @@ button.secondary {
   font-size: 32px;
   font-weight: 700;
   margin: 10px 0;
-}
-
-.meta {
-  font-size: 14px;
-  color: #aaa;
-}
-
-.actions {
-  margin-top: 15px;
-  display: flex;
-  gap: 10px;
 }
 </style>
 </head>
@@ -133,38 +116,48 @@ button.secondary {
 
 <div class="room">
   <div id="me" class="card"></div>
-  <div id="other" class="card"></div>
+  <div id="others"></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
-// 🔴 FIREBASE CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyDtldC_Jkba7d-FNoLRJfM7aJSdu0QPMpA",
   authDomain: "study-room-b3934.firebaseapp.com",
-  databaseURL: "https://study-room-b3934-default-rtdb.firebaseio.com/",
+  databaseURL: "https://study-room-b3934-default-rtdb.firebaseio.com",
   projectId: "study-room-b3934",
-  storageBucket: "study-room-b3934.appspot.com",
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+let uid = null;
 let myName = "";
 let status = "break";
 let startTime = 0;
 let total = 0;
-let maxSession = 0;
-let timerInterval = null;
+let timer = null;
 
 function join() {
   myName = nameInput.value.trim();
-  if (!myName) return alert("Enter your name");
+  if (!myName) return alert("Enter name");
 
-  // Hide join input and button
+  uid = "u_" + Math.random().toString(36).slice(2, 10);
+
   document.getElementById("joinDiv").style.display = "none";
+
+  const ref = db.ref("users/" + uid);
+
+  ref.onDisconnect().remove();
+
+  ref.set({
+    name: myName,
+    status,
+    total,
+    joined: Date.now()
+  });
 
   listen();
   render();
@@ -174,96 +167,61 @@ function startStudy() {
   if (status === "study") return;
   status = "study";
   startTime = Date.now();
-  if (!timerInterval) {
-    timerInterval = setInterval(updateTimer, 1000);
-  }
-  sync(); // send immediately
+  timer = setInterval(update, 1000);
 }
 
 function pauseStudy() {
   if (status === "break") return;
-  const s = Math.floor((Date.now() - startTime) / 1000);
-  total += s;
-  maxSession = Math.max(maxSession, s);
+  total += Math.floor((Date.now() - startTime) / 1000);
   status = "break";
-  clearInterval(timerInterval);
-  timerInterval = null;
+  clearInterval(timer);
   sync();
 }
 
-function resetMe() {
-  total = 0;
-  maxSession = 0;
-  status = "break";
-  clearInterval(timerInterval);
-  timerInterval = null;
-  sync();
-}
-
-function updateTimer() {
-  if (status === "study") {
-    const liveTotal = total + Math.floor((Date.now() - startTime) / 1000);
-    render(liveTotal);
-    // Sync live total every second so others can see it
-    db.ref("users/" + myName).set({
-      status,
-      total: liveTotal,
-      maxSession,
-    });
-  }
+function update() {
+  const live = total + Math.floor((Date.now() - startTime) / 1000);
+  db.ref("users/" + uid).update({ status, total: live });
+  render(live);
 }
 
 function sync() {
-  db.ref("users/" + myName).set({
-    status,
-    total,
-    maxSession,
-  });
+  db.ref("users/" + uid).update({ status, total });
   render();
 }
 
-function render(liveTotal = null) {
-  const displayTime = liveTotal !== null ? liveTotal : total;
-  const formattedTime = fmt(displayTime);
-
+function render(live = null) {
+  const t = live ?? total;
   me.className = "card " + (status === "study" ? "study" : "");
   me.innerHTML = `
     <div class="name">${myName} (You)</div>
-    <div class="status">${status === "study" ? "Studying" : "Break"}</div>
-    <div class="time">${formattedTime}</div>
-    <div class="meta">Max session: ${fmt(maxSession)}</div>
-    <div class="actions">
-      <button onclick="startStudy()">Start</button>
-      <button onclick="pauseStudy()" class="secondary">Pause</button>
-      <button onclick="resetMe()" class="secondary">Reset</button>
-    </div>
+    <div class="status">${status}</div>
+    <div class="time">${fmt(t)}</div>
+    <button onclick="startStudy()">Start</button>
+    <button onclick="pauseStudy()" class="secondary">Pause</button>
   `;
 }
 
 function listen() {
   db.ref("users").on("value", snap => {
-    const users = snap.val() || {};
-    for (let n in users) {
-      if (n !== myName) showOther(n, users[n]);
+    others.innerHTML = "";
+    const data = snap.val() || {};
+    for (let id in data) {
+      if (id === uid) continue;
+      const u = data[id];
+      others.innerHTML += `
+        <div class="card ${u.status === "study" ? "study" : ""}">
+          <div class="name">${u.name}</div>
+          <div class="status">${u.status}</div>
+          <div class="time">${fmt(u.total)}</div>
+        </div>`;
     }
   });
 }
 
-function showOther(name, d) {
-  other.className = "card " + (d.status === "study" ? "study" : "");
-  other.innerHTML = `
-    <div class="name">${name}</div>
-    <div class="status">${d.status === "study" ? "Studying" : "Break"}</div>
-    <div class="time">${fmt(d.total)}</div>
-    <div class="meta">Max session: ${fmt(d.maxSession)}</div>
-  `;
-}
-
 function fmt(s) {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
+  const m = Math.floor(s / 60);
   const sec = s % 60;
-  return `${h}h ${m}m ${sec}s`;
+  return `${m}m ${sec}s`;
 }
 </script>
 
