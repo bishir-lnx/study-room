@@ -8,82 +8,29 @@
 
 <style>
 :root {
-  --bg: #0e0e0e;
-  --card: #181818;
-  --border: #2a2a2a;
-  --orange: #ff9f1a;
-  --dim: #444;
-  --text: #eaeaea;
+  --bg:#0e0e0e;--card:#181818;--border:#2a2a2a;
+  --orange:#ff9f1a;--dim:#444;--text:#eaeaea;
 }
-
-* {
-  box-sizing: border-box;
-  font-family: Inter, sans-serif;
-}
-
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-height: 100vh;
-}
-
-h1 { margin: 30px 0 10px; }
-
-.join { margin: 15px 0 30px; }
-
-input {
-  background: var(--card);
-  border: 1px solid var(--border);
-  color: var(--text);
-  padding: 10px 14px;
-  border-radius: 8px;
-}
-
-button {
-  background: var(--orange);
-  border: none;
-  color: black;
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-button.secondary {
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--border);
-}
-
-.room {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(260px, 1fr));
-  gap: 20px;
-  width: min(800px, 100%);
-  padding: 20px;
-}
-
-.card {
-  background: var(--card);
-  border-radius: 14px;
-  padding: 20px;
-  border: 1px solid var(--border);
-}
-
-.card.study {
-  border-color: var(--orange);
-  box-shadow: 0 0 20px #ff9f1a33;
-}
-
-.name { font-size: 18px; font-weight: 600; }
-.status { font-size: 14px; color: var(--dim); }
-.study .status { color: var(--orange); }
-.time { font-size: 32px; font-weight: 700; margin: 10px 0; }
-.meta { font-size: 14px; color: #aaa; }
+*{box-sizing:border-box;font-family:Inter,sans-serif}
+body{margin:0;background:var(--bg);color:var(--text);
+display:flex;flex-direction:column;align-items:center;min-height:100vh}
+h1{margin:30px 0 10px}
+.join{margin:20px}
+input{background:var(--card);border:1px solid var(--border);
+color:var(--text);padding:10px 14px;border-radius:8px;margin:5px}
+button{background:var(--orange);border:none;color:black;
+padding:10px 16px;border-radius:8px;font-weight:600;cursor:pointer;margin:5px}
+button.secondary{background:transparent;color:var(--text);
+border:1px solid var(--border)}
+.room{display:none;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+gap:20px;width:min(800px,100%);padding:20px}
+.card{background:var(--card);border-radius:14px;padding:20px;
+border:1px solid var(--border)}
+.card.study{border-color:var(--orange);box-shadow:0 0 20px #ff9f1a33}
+.name{font-size:18px;font-weight:600}
+.status{font-size:14px;color:var(--dim)}
+.study .status{color:var(--orange)}
+.time{font-size:32px;font-weight:700;margin:10px 0}
 </style>
 </head>
 
@@ -91,133 +38,150 @@ button.secondary {
 
 <h1>📚 Study Room</h1>
 
-<div class="join" id="joinDiv">
-  <input id="nameInput" placeholder="Your name">
-  <button onclick="join()">Join</button>
+<!-- STEP 1 -->
+<div class="join" id="modeDiv">
+  <button onclick="chooseMode('create')">Create Room</button>
+  <button onclick="chooseMode('join')">Join Room</button>
 </div>
 
-<div class="room">
+<!-- STEP 2 -->
+<div class="join" id="joinDiv" style="display:none">
+  <input id="roomInput" placeholder="Room code">
+  <input id="nameInput" placeholder="Your name">
+  <button onclick="enterRoom()">Enter</button>
+</div>
+
+<!-- STEP 3 -->
+<div class="room" id="roomDiv">
   <div id="me" class="card"></div>
-  <div id="friend" class="card"></div>
+  <div id="other" class="card"></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyDtldC_Jkba7d-FNoLRJfM7aJSdu0QPMpA",
-  databaseURL: "https://study-room-b3934-default-rtdb.firebaseio.com",
+const firebaseConfig={
+ apiKey:"AIzaSyDtldC_Jkba7d-FNoLRJfM7aJSdu0QPMpA",
+ authDomain:"study-room-b3934.firebaseapp.com",
+ databaseURL:"https://study-room-b3934-default-rtdb.firebaseio.com",
+ projectId:"study-room-b3934"
 };
 firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+firebase.auth().signInAnonymously();
+const db=firebase.database();
 
-let uid = "u_" + Math.random().toString(36).slice(2, 9);
-let myName = "";
-let mySlot = null;
+let uid=null,mode="",roomCode="",mySlot="",myName="";
+let status="break",startTime=0,total=0,maxSession=0,timer=null;
 
-let status = "On a break";
-let startTime = 0;
-let total = 0;
-let maxSession = 0;
-let timer = null;
+firebase.auth().onAuthStateChanged(u=>uid=u.uid);
 
-function join() {
-  myName = nameInput.value.trim();
-  if (!myName) return alert("Enter name");
-
-  db.ref("room").get().then(snap => {
-    const r = snap.val() || {};
-    if (!r.slot1) mySlot = "slot1";
-    else if (!r.slot2) mySlot = "slot2";
-    else return alert("Room full (2 people max)");
-
-    db.ref("room/" + mySlot).set({
-      uid, name: myName, status, total, maxSession
-    });
-
-    db.ref("room/" + mySlot).onDisconnect().remove();
-    joinDiv.style.display = "none";
-    listen();
-    render();
-  });
+function chooseMode(m){
+ mode=m;
+ modeDiv.style.display="none";
+ joinDiv.style.display="block";
 }
 
-function startStudy() {
-  if (status === "Studying") return;
-  status = "Studying";
-  startTime = Date.now();
-  timer = setInterval(update, 1000);
-}
+function enterRoom(){
+ roomCode=roomInput.value.trim();
+ myName=nameInput.value.trim();
+ if(!roomCode||!myName) return alert("Fill all fields");
 
-function pauseStudy() {
-  if (status !== "Studying") return;
-  const s = Math.floor((Date.now() - startTime) / 1000);
-  total += s;
-  maxSession = Math.max(maxSession, s);
-  status = "On a break";
-  clearInterval(timer);
-  sync();
-}
+ const roomRef=db.ref("rooms/"+roomCode);
+ roomRef.once("value").then(s=>{
+  const r=s.val();
 
-function resetStudy() {
-  total = 0;
-  maxSession = 0;
-  status = "On a break";
-  clearInterval(timer);
-  sync();
-}
+  if(mode==="join" && !r) return alert("Room does not exist");
 
-function update() {
-  const live = total + Math.floor((Date.now() - startTime) / 1000);
-  db.ref("room/" + mySlot).update({ status, total: live, maxSession });
-  render(live);
-}
+  if(!r) roomRef.set({});
 
-function sync() {
-  db.ref("room/" + mySlot).update({ status, total, maxSession });
+  if(!r?.slot1) mySlot="slot1";
+  else if(!r?.slot2) mySlot="slot2";
+  else return alert("Room full");
+
+  const ref=roomRef.child(mySlot);
+  ref.set({uid,name:myName,status,total,maxSession});
+  ref.onDisconnect().remove();
+
+  joinDiv.style.display="none";
+  roomDiv.style.display="grid";
+  listen();
   render();
+ });
 }
 
-function listen() {
-  db.ref("room").on("value", snap => {
-    const r = snap.val() || {};
-    friend.innerHTML = "";
-    for (let k in r) {
-      if (r[k].uid !== uid) showFriend(r[k]);
-    }
-  });
+function startStudy(){
+ if(status==="study")return;
+ status="study";startTime=Date.now();
+ timer=setInterval(update,1000);
 }
 
-function render(live = null) {
-  const t = live ?? total;
-  me.className = "card " + (status === "Studying" ? "study" : "");
-  me.innerHTML = `
-    <div class="name">${myName} (You)</div>
-    <div class="status">${status}</div>
-    <div class="time">${fmt(t)}</div>
-    <div class="meta">Max session: ${fmt(maxSession)}</div>
-    <button onclick="startStudy()">Start</button>
-    <button onclick="pauseStudy()" class="secondary">Pause</button>
-    <button onclick="resetStudy()" class="secondary">Reset</button>
-  `;
+function pauseStudy(){
+ if(status==="break")return;
+ const s=Math.floor((Date.now()-startTime)/1000);
+ total+=s;maxSession=Math.max(maxSession,s);
+ status="break";clearInterval(timer);sync();
 }
 
-function showFriend(u) {
-  friend.className = "card " + (u.status === "Studying" ? "study" : "");
-  friend.innerHTML = `
-    <div class="name">${u.name}</div>
-    <div class="status">${u.status}</div>
-    <div class="time">${fmt(u.total)}</div>
-    <div class="meta">Max session: ${fmt(u.maxSession)}</div>
-  `;
+function resetMe(){
+ total=0;maxSession=0;
+ status="break";clearInterval(timer);sync();
 }
 
-function fmt(s) {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  return `${h}h ${m}m ${sec}s`;
+function exitRoom(){
+ db.ref(`rooms/${roomCode}/${mySlot}`).remove();
+ location.reload();
+}
+
+function update(){
+ const live=total+Math.floor((Date.now()-startTime)/1000);
+ db.ref(`rooms/${roomCode}/${mySlot}`).update({status,total:live,maxSession});
+ render(live);
+}
+
+function sync(){
+ db.ref(`rooms/${roomCode}/${mySlot}`).update({status,total,maxSession});
+ render();
+}
+
+function listen(){
+ db.ref("rooms/"+roomCode).on("value",s=>{
+  const r=s.val()||{};
+  const otherSlot=mySlot==="slot1"?"slot2":"slot1";
+  showOther(r[otherSlot]);
+ });
+}
+
+function showOther(d){
+ if(!d){other.innerHTML="";return;}
+ other.className="card "+(d.status==="study"?"study":"");
+ other.innerHTML=`
+  <div class="name">${d.name}</div>
+  <div class="status">${d.status==="study"?"Studying":"On break"}</div>
+  <div class="time">${fmt(d.total)}</div>
+  <div class="meta">Max session: ${fmt(d.maxSession)}</div>`;
+}
+
+function render(live=null){
+ const t=live??total;
+ me.className="card "+(status==="study"?"study":"");
+ me.innerHTML=`
+  <div class="name">${myName} (You)</div>
+  <div class="status">${status==="study"?"Studying":"On break"}</div>
+  <div class="time">${fmt(t)}</div>
+  <div class="meta">Max session: ${fmt(maxSession)}</div>
+  <button onclick="startStudy()">Start</button>
+  <button onclick="pauseStudy()" class="secondary">Pause</button>
+  <button onclick="resetMe()" class="secondary">Reset</button>
+  <button onclick="exitRoom()" class="secondary">Exit</button>`;
+}
+
+function fmt(s){
+ const h=Math.floor(s/3600);
+ const m=Math.floor((s%3600)/60);
+ const sec=s%60;
+ return `${h}h ${m}m ${sec}s`;
 }
 </script>
 
