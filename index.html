@@ -92,7 +92,7 @@
 </div>
 
 <div id="pip-assets">
-    <canvas id="pip-canvas" width="240" height="100"></canvas>
+    <canvas id="pip-canvas" width="960" height="400"></canvas>
     <video id="pip-video" autoplay muted playsinline loop></video>
 </div>
 
@@ -143,7 +143,7 @@
         if (hrs >= 7)  return "🗿";
         if (hrs >= 5)  return "🔥";
         if (hrs >= 3)  return "🌿";
-        if (hrs >= 1)  return "🍃"; // Unlocked!
+        if (hrs >= 1)  return "🍃";
         return "🌱";
     }
 
@@ -176,15 +176,32 @@
     };
 
     function updatePiP(time, emoji) {
+        // High Quality Rendering
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#181818';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#eaeaea';
+        
+        // Font settings for sharpness
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.font = 'bold 40px Inter, sans-serif';
-        ctx.fillText(time, canvas.width / 2 - 20, canvas.height / 2);
-        ctx.font = '30px Inter';
-        ctx.fillText(emoji, canvas.width - 40, canvas.height / 2);
+        
+        // Timer - Using White for high contrast sharpness
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 180px "Inter", sans-serif';
+        // Shifted left slightly to make room for the emoji "badge"
+        ctx.fillText(time, canvas.width / 2 - 60, canvas.height / 2);
+        
+        // Emoji - Placed as a Badge in the top right
+        ctx.font = '120px "Inter"';
+        ctx.fillText(emoji, canvas.width - 120, canvas.height / 2);
+        
+        // Optional subtle divider for Sanjay's eye
+        ctx.strokeStyle = '#2a2a2a';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(canvas.width - 240, 80);
+        ctx.lineTo(canvas.width - 240, 320);
+        ctx.stroke();
     }
 
     document.addEventListener("visibilitychange", () => {
