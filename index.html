@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bishir & Sanjay Study</title>
+    <title>Bishir & Sanjay Study Sync</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #0e0e0e; --card: #181818; --border: #2a2a2a; --primary: #1abc9c; --text: #eaeaea; --dim: #888; --red: #e74c3c; --accent: #3498db; }
@@ -17,6 +17,13 @@
         @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
         .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 25px; text-align: center; transition: 0.3s; position: relative; overflow: hidden; }
         .card.studying { border-color: var(--primary); box-shadow: 0 0 25px rgba(26, 188, 156, 0.15); }
+        .reward-badge { position: absolute; top: 15px; right: 15px; font-size: 1.8rem; }
+        @keyframes rewardPop {
+            0% { transform: scale(0.5); opacity: 0; }
+            70% { transform: scale(1.3); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .pop-effect { animation: rewardPop 0.5s ease-out; }
         .name { font-size: 1.3rem; font-weight: 700; margin-bottom: 5px; }
         .status-badge { display: inline-block; font-size: 0.8rem; padding: 4px 12px; border-radius: 20px; background: #222; color: var(--dim); margin-bottom: 20px; }
         .card.studying .status-badge { background: rgba(26, 188, 156, 0.2); color: var(--primary); }
@@ -34,9 +41,10 @@
         th, td { text-align: left; padding: 12px; border-bottom: 1px solid #2a2a2a; }
         th { color: var(--dim); font-size: 0.8rem; text-transform: uppercase; }
         #pip-assets { position: fixed; left: -9999px; }
+        .is-android .btn-pip { display: none; }
     </style>
 </head>
-<body>
+<body id="main-body">
 
 <div id="identity-overlay">
     <h2 style="margin-bottom:30px">Select Your Profile</h2>
@@ -48,6 +56,7 @@
     <h1>📚 Study Sync</h1>
     <div class="grid">
         <div id="card-Bishir" class="card">
+            <div id="reward-Bishir" class="reward-badge">🌱</div>
             <div class="name">Bishir</div>
             <div id="status-Bishir" class="status-badge">Offline</div>
             <div id="timer-Bishir" class="timer-display">00:00:00</div>
@@ -60,6 +69,7 @@
             </div>
         </div>
         <div id="card-Sanjay" class="card">
+            <div id="reward-Sanjay" class="reward-badge">🌱</div>
             <div class="name">Sanjay</div>
             <div id="status-Sanjay" class="status-badge">Offline</div>
             <div id="timer-Sanjay" class="timer-display">00:00:00</div>
@@ -72,7 +82,6 @@
             </div>
         </div>
     </div>
-
     <div class="history-section">
         <h3 style="margin:0">📅 History (Last 5 Days)</h3>
         <table id="history-table">
@@ -83,7 +92,7 @@
 </div>
 
 <div id="pip-assets">
-    <canvas id="pip-canvas" width="400" height="200"></canvas>
+    <canvas id="pip-canvas" width="240" height="100"></canvas>
     <video id="pip-video" autoplay muted playsinline loop></video>
 </div>
 
@@ -104,7 +113,12 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
+    if (/Android/i.test(navigator.userAgent)) {
+        document.getElementById('main-body').classList.add('is-android');
+    }
+
     let myName = localStorage.getItem('studyUser');
+    let lastEmoji = { Bishir: "", Sanjay: "" };
     let appState = { 
         Bishir: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" }, 
         Sanjay: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" }, 
@@ -112,12 +126,9 @@
     };
 
     if(myName) { document.getElementById('identity-overlay').style.display = 'none'; showControls(); }
-    
     window.setIdentity = (name) => { 
-        myName = name; 
-        localStorage.setItem('studyUser', name); 
-        document.getElementById('identity-overlay').style.display = 'none'; 
-        showControls(); 
+        myName = name; localStorage.setItem('studyUser', name); 
+        document.getElementById('identity-overlay').style.display = 'none'; showControls(); 
     };
 
     function showControls() { 
@@ -125,56 +136,60 @@
         if(ctrl) ctrl.style.display = 'flex'; 
     }
 
-    // --- PIP LOGIC ---
+    function getEmoji(seconds) {
+        const hrs = seconds / 3600;
+        if (hrs >= 12) return "🌌";
+        if (hrs >= 9)  return "👑";
+        if (hrs >= 7)  return "🗿";
+        if (hrs >= 5)  return "🔥";
+        if (hrs >= 3)  return "🌿";
+        if (hrs >= 1)  return "🍃"; // Unlocked!
+        return "🌱";
+    }
+
+    function updateUIExtras(user, seconds) {
+        const emoji = getEmoji(seconds);
+        const el = document.getElementById(`reward-${user}`);
+        if (emoji !== lastEmoji[user]) {
+            el.innerText = emoji;
+            el.classList.remove('pop-effect');
+            void el.offsetWidth;
+            el.classList.add('pop-effect');
+            lastEmoji[user] = emoji;
+        }
+    }
+
     const canvas = document.getElementById('pip-canvas');
     const ctx = canvas.getContext('2d');
     const video = document.getElementById('pip-video');
 
     window.togglePiP = async () => {
         try {
-            if (document.pictureInPictureElement) {
-                await document.exitPictureInPicture();
-            } else {
-                // Ensure stream is active
+            if (document.pictureInPictureElement) await document.exitPictureInPicture();
+            else {
                 const stream = canvas.captureStream(30);
                 video.srcObject = stream;
                 await video.play();
                 await video.requestPictureInPicture();
             }
-        } catch (err) {
-            console.error("PiP failed", err);
-            alert("To enable floating timer, please ensure your browser allows Picture-in-Picture.");
-        }
+        } catch (err) { console.error(err); }
     };
 
-    function updatePiPCanvas(timeText) {
-        // Draw background
+    function updatePiP(time, emoji) {
         ctx.fillStyle = '#181818';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Draw Accent Bar
-        ctx.fillStyle = '#1abc9c';
-        ctx.fillRect(0, 0, canvas.width, 10);
-
-        // Draw Name
-        ctx.font = 'bold 24px Inter, sans-serif';
-        ctx.fillStyle = '#888';
-        ctx.textAlign = 'center';
-        ctx.fillText(myName, canvas.width / 2, 50);
-
-        // Draw Timer
-        ctx.font = 'bold 80px Inter, sans-serif';
         ctx.fillStyle = '#eaeaea';
-        ctx.fillText(timeText, canvas.width / 2, 130);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 40px Inter, sans-serif';
+        ctx.fillText(time, canvas.width / 2 - 20, canvas.height / 2);
+        ctx.font = '30px Inter';
+        ctx.fillText(emoji, canvas.width - 40, canvas.height / 2);
     }
 
-    // Modify Visibility Change: Only pause if NOT in PiP
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "hidden" && appState[myName].status === 'studying') {
-            // Edge and Firefox Android behavior differ here, this check helps both
-            if (!document.pictureInPictureElement) {
-                window.handleToggle();
-            }
+            if (!document.pictureInPictureElement) window.handleToggle();
         }
     });
 
@@ -182,15 +197,9 @@
         const data = snap.val();
         if(data) {
             const today = new Date().toLocaleDateString('en-CA');
-            if(data.todayDate && data.todayDate !== today) { 
-                runMidnightReset(data, today); 
-            } else { 
-                appState = data; 
-                renderStatic(); 
-            }
-        } else { 
-            update(ref(db, 'stats'), appState); 
-        }
+            if(data.todayDate && data.todayDate !== today) runMidnightReset(data, today);
+            else { appState = data; renderStatic(); }
+        } else update(ref(db, 'stats'), appState);
     });
 
     onValue(ref(db, 'history'), (snap) => {
@@ -206,74 +215,47 @@
     window.handleToggle = () => {
         const s = appState[myName];
         const nowTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-        
         if (s.status === 'studying') {
             const session = Math.floor((Date.now() - s.startTime) / 1000);
             update(ref(db, `stats/${myName}`), { 
-                status: 'break', 
-                totalToday: (s.totalToday || 0) + session, 
-                maxSession: Math.max((s.maxSession || 0), session), 
-                startTime: 0,
+                status: 'break', totalToday: (s.totalToday || 0) + session, 
+                maxSession: Math.max((s.maxSession || 0), session), startTime: 0,
                 lastBreakAt: `Took break at ${nowTime}`
             });
         } else {
-            update(ref(db, `stats/${myName}`), { 
-                status: 'studying', 
-                startTime: Date.now(),
-                lastBreakAt: "" 
-            });
+            update(ref(db, `stats/${myName}`), { status: 'studying', startTime: Date.now(), lastBreakAt: "" });
         }
     };
 
     window.handleReset = () => { 
-        if(confirm("Reset today's time?")) {
-            update(ref(db, `stats/${myName}`), { totalToday: 0, startTime: 0, status: 'break', maxSession: 0, lastBreakAt: "" }); 
-        }
+        if(confirm("Reset today's time?")) update(ref(db, `stats/${myName}`), { totalToday: 0, startTime: 0, status: 'break', maxSession: 0, lastBreakAt: "" }); 
     };
 
     async function runMidnightReset(oldData, newDate) {
         const historyRef = ref(db, 'history');
         const snapshot = await get(historyRef);
-        let historyEntries = snapshot.exists() ? Object.values(snapshot.val()) : [];
-        historyEntries.push({ date: oldData.todayDate, Bishir: fmt(oldData.Bishir.totalToday), Sanjay: fmt(oldData.Sanjay.totalToday) });
-        historyEntries.sort((a,b) => new Date(b.date) - new Date(a.date));
-        const prunedHistory = {};
-        historyEntries.slice(0, 5).forEach(e => { prunedHistory[e.date] = e; });
-
-        update(ref(db), {
-            'history': prunedHistory,
-            'stats': { 
-                todayDate: newDate, 
-                Bishir: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" }, 
-                Sanjay: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" } 
-            }
-        });
+        let entries = snapshot.exists() ? Object.values(snapshot.val()) : [];
+        entries.push({ date: oldData.todayDate, Bishir: fmt(oldData.Bishir.totalToday), Sanjay: fmt(oldData.Sanjay.totalToday) });
+        entries.sort((a,b) => new Date(b.date) - new Date(a.date));
+        const pruned = {};
+        entries.slice(0, 5).forEach(e => { pruned[e.date] = e; });
+        update(ref(db), { 'history': pruned, 'stats': { todayDate: newDate, Bishir: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" }, Sanjay: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" } } });
     }
 
     function renderStatic() {
         ['Bishir', 'Sanjay'].forEach(u => {
-            const card = document.getElementById(`card-${u}`);
-            const status = document.getElementById(`status-${u}`);
-            const msgEl = document.getElementById(`msg-${u}`);
-            const toggleBtn = document.getElementById(`toggle-${u}`);
-            
             const data = appState[u];
             const isStudying = data.status === 'studying';
-
-            card.className = `card ${isStudying ? 'studying' : ''}`;
-            status.innerText = isStudying ? 'Studying' : 'On Break';
+            document.getElementById(`card-${u}`).className = `card ${isStudying ? 'studying' : ''}`;
+            document.getElementById(`status-${u}`).innerText = isStudying ? 'Studying' : 'On Break';
             document.getElementById(`max-${u}`).innerText = fmt(data.maxSession || 0);
-
-            if (data.lastBreakAt && !isStudying) {
-                msgEl.innerText = data.lastBreakAt;
-                msgEl.style.display = 'inline-block';
-            } else {
-                msgEl.style.display = 'none';
-            }
-
-            if(u === myName && toggleBtn) {
-                toggleBtn.innerText = isStudying ? "Pause" : (data.totalToday > 0 ? "Resume" : "Start");
-                isStudying ? toggleBtn.classList.add('btn-pause-mode') : toggleBtn.classList.remove('btn-pause-mode');
+            const msgEl = document.getElementById(`msg-${u}`);
+            if (data.lastBreakAt && !isStudying) { msgEl.innerText = data.lastBreakAt; msgEl.style.display = 'inline-block'; }
+            else msgEl.style.display = 'none';
+            if(u === myName) {
+                const btn = document.getElementById(`toggle-${u}`);
+                btn.innerText = isStudying ? "Pause" : (data.totalToday > 0 ? "Resume" : "Start");
+                isStudying ? btn.classList.add('btn-pause-mode') : btn.classList.remove('btn-pause-mode');
             }
         });
     }
@@ -281,14 +263,12 @@
     setInterval(() => {
         ['Bishir', 'Sanjay'].forEach(u => {
             let t = appState[u].totalToday || 0;
-            if(appState[u].status === 'studying' && appState[u].startTime) {
-                t += Math.floor((Date.now() - appState[u].startTime) / 1000);
-            }
-            const timeText = fmt(t);
+            if(appState[u].status === 'studying' && appState[u].startTime) t += Math.floor((Date.now() - appState[u].startTime) / 1000);
+            const timeStr = fmt(t);
             const el = document.getElementById(`timer-${u}`);
-            if(el) el.innerText = timeText;
-
-            if(u === myName) updatePiPCanvas(timeText);
+            if(el) el.innerText = timeStr;
+            updateUIExtras(u, t);
+            if(u === myName) updatePiP(timeStr, getEmoji(t));
         });
     }, 1000);
 
