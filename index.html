@@ -22,19 +22,18 @@
         .card.studying .status-badge { background: rgba(26, 188, 156, 0.2); color: var(--primary); }
         .timer-display { font-size: 3rem; font-weight: 700; font-variant-numeric: tabular-nums; }
         .max-display { font-size: 0.85rem; color: var(--dim); margin-top: 10px; }
-        
-        /* Break Message Style */
         .break-msg { font-size: 0.8rem; color: var(--accent); background: rgba(52, 152, 219, 0.1); border: 1px solid rgba(52, 152, 219, 0.2); padding: 6px 12px; border-radius: 8px; margin-top: 15px; display: none; transition: 0.3s; }
-
-        .controls { margin-top: 25px; display: flex; gap: 10px; justify-content: center; }
+        .controls { margin-top: 25px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
         button.action { padding: 10px 18px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; min-width: 100px; }
         .btn-toggle { background: var(--primary); color: #000; }
         .btn-pause-mode { background: transparent !important; border: 1px solid var(--dim) !important; color: var(--text) !important; }
         .btn-reset { background: transparent; border: 1px solid var(--red); color: var(--red); opacity: 0.6; }
+        .btn-pip { background: #333; color: #fff; border: 1px solid #444; }
         .history-section { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 50px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { text-align: left; padding: 12px; border-bottom: 1px solid #2a2a2a; }
         th { color: var(--dim); font-size: 0.8rem; text-transform: uppercase; }
+        #pip-assets { position: fixed; left: -9999px; }
     </style>
 </head>
 <body>
@@ -56,6 +55,7 @@
             <div id="msg-Bishir" class="break-msg"></div>
             <div id="controls-Bishir" class="controls" style="display:none">
                 <button id="toggle-Bishir" class="action btn-toggle" onclick="handleToggle()">Start</button>
+                <button class="action btn-pip" onclick="togglePiP()">PiP</button>
                 <button class="action btn-reset" onclick="handleReset()">Reset</button>
             </div>
         </div>
@@ -67,6 +67,7 @@
             <div id="msg-Sanjay" class="break-msg"></div>
             <div id="controls-Sanjay" class="controls" style="display:none">
                 <button id="toggle-Sanjay" class="action btn-toggle" onclick="handleToggle()">Start</button>
+                <button class="action btn-pip" onclick="togglePiP()">PiP</button>
                 <button class="action btn-reset" onclick="handleReset()">Reset</button>
             </div>
         </div>
@@ -79,6 +80,11 @@
             <tbody id="history-body"></tbody>
         </table>
     </div>
+</div>
+
+<div id="pip-assets">
+    <canvas id="pip-canvas" width="400" height="200"></canvas>
+    <video id="pip-video" autoplay muted playsinline loop></video>
 </div>
 
 <script type="module">
@@ -119,9 +125,56 @@
         if(ctrl) ctrl.style.display = 'flex'; 
     }
 
+    // --- PIP LOGIC ---
+    const canvas = document.getElementById('pip-canvas');
+    const ctx = canvas.getContext('2d');
+    const video = document.getElementById('pip-video');
+
+    window.togglePiP = async () => {
+        try {
+            if (document.pictureInPictureElement) {
+                await document.exitPictureInPicture();
+            } else {
+                // Ensure stream is active
+                const stream = canvas.captureStream(30);
+                video.srcObject = stream;
+                await video.play();
+                await video.requestPictureInPicture();
+            }
+        } catch (err) {
+            console.error("PiP failed", err);
+            alert("To enable floating timer, please ensure your browser allows Picture-in-Picture.");
+        }
+    };
+
+    function updatePiPCanvas(timeText) {
+        // Draw background
+        ctx.fillStyle = '#181818';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw Accent Bar
+        ctx.fillStyle = '#1abc9c';
+        ctx.fillRect(0, 0, canvas.width, 10);
+
+        // Draw Name
+        ctx.font = 'bold 24px Inter, sans-serif';
+        ctx.fillStyle = '#888';
+        ctx.textAlign = 'center';
+        ctx.fillText(myName, canvas.width / 2, 50);
+
+        // Draw Timer
+        ctx.font = 'bold 80px Inter, sans-serif';
+        ctx.fillStyle = '#eaeaea';
+        ctx.fillText(timeText, canvas.width / 2, 130);
+    }
+
+    // Modify Visibility Change: Only pause if NOT in PiP
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "hidden" && appState[myName].status === 'studying') {
-            window.handleToggle();
+            // Edge and Firefox Android behavior differ here, this check helps both
+            if (!document.pictureInPictureElement) {
+                window.handleToggle();
+            }
         }
     });
 
@@ -152,12 +205,7 @@
 
     window.handleToggle = () => {
         const s = appState[myName];
-        // Fixed: Use hour12: true for AM/PM format
-        const nowTime = new Date().toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
-            minute: '2-digit', 
-            hour12: true 
-        });
+        const nowTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
         
         if (s.status === 'studying') {
             const session = Math.floor((Date.now() - s.startTime) / 1000);
@@ -236,8 +284,11 @@
             if(appState[u].status === 'studying' && appState[u].startTime) {
                 t += Math.floor((Date.now() - appState[u].startTime) / 1000);
             }
+            const timeText = fmt(t);
             const el = document.getElementById(`timer-${u}`);
-            if(el) el.innerText = fmt(t);
+            if(el) el.innerText = timeText;
+
+            if(u === myName) updatePiPCanvas(timeText);
         });
     }, 1000);
 
