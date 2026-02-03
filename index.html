@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Study Sync: Bishir, Sanjay & Krishnan</title>
+    <title>Study Sync: Bishir, Sanjay, Krishnan & Kashi</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #0e0e0e; --card: #181818; --border: #2a2a2a; --primary: #1abc9c; --text: #eaeaea; --dim: #888; --red: #e74c3c; --accent: #3498db; }
         body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-        .container { width: 95%; max-width: 1000px; margin-top: 40px; } /* Increased max-width for 3 cards */
+        .container { width: 95%; max-width: 900px; margin-top: 40px; }
         h1 { text-align: center; margin-bottom: 30px; font-weight: 700; }
         #identity-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
         .identity-btn { background: var(--card); border: 1px solid var(--primary); color: var(--primary); font-size: 20px; padding: 15px 40px; margin: 10px; border-radius: 8px; cursor: pointer; width: 220px; transition: 0.2s; font-weight: 600; }
         .identity-btn:hover { background: var(--primary); color: #000; }
         
-        /* Updated Grid for 3 Users */
-        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 40px; }
-        @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } } /* Stacks on tablets/phones */
+        /* 2x2 Grid for 4 Users */
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 40px; }
+        @media (max-width: 650px) { .grid { grid-template-columns: 1fr; } } /* Stacks on phones */
         
         .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 25px; text-align: center; transition: 0.3s; position: relative; overflow: hidden; }
         .card.studying { border-color: var(--primary); box-shadow: 0 0 25px rgba(26, 188, 156, 0.15); }
@@ -31,9 +31,6 @@
         .status-badge { display: inline-block; font-size: 0.8rem; padding: 4px 12px; border-radius: 20px; background: #222; color: var(--dim); margin-bottom: 20px; }
         .card.studying .status-badge { background: rgba(26, 188, 156, 0.2); color: var(--primary); }
         .timer-display { font-size: 3rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-        /* Adjusted font size slightly for 3-column layout on smaller laptop screens */
-        @media (min-width: 901px) and (max-width: 1100px) { .timer-display { font-size: 2.5rem; } }
-        
         .max-display { font-size: 0.85rem; color: var(--dim); margin-top: 10px; }
         .break-msg { font-size: 0.8rem; color: var(--accent); background: rgba(52, 152, 219, 0.1); border: 1px solid rgba(52, 152, 219, 0.2); padding: 6px 12px; border-radius: 8px; margin-top: 15px; display: none; transition: 0.3s; }
         .controls { margin-top: 25px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
@@ -57,6 +54,7 @@
     <button class="identity-btn" onclick="setIdentity('Bishir')">Bishir</button>
     <button class="identity-btn" onclick="setIdentity('Sanjay')">Sanjay</button>
     <button class="identity-btn" onclick="setIdentity('Krishnan')">Krishnan</button>
+    <button class="identity-btn" onclick="setIdentity('Kashi')">Kashi</button>
 </div>
 
 <div class="container">
@@ -103,12 +101,26 @@
                 <button class="action btn-reset" onclick="handleReset()">Reset</button>
             </div>
         </div>
+
+        <div id="card-Kashi" class="card">
+            <div id="reward-Kashi" class="reward-badge">🌱</div>
+            <div class="name">Kashi</div>
+            <div id="status-Kashi" class="status-badge">Offline</div>
+            <div id="timer-Kashi" class="timer-display">00:00:00</div>
+            <div class="max-display">Max Session: <span id="max-Kashi">00:00:00</span></div>
+            <div id="msg-Kashi" class="break-msg"></div>
+            <div id="controls-Kashi" class="controls" style="display:none">
+                <button id="toggle-Kashi" class="action btn-toggle" onclick="handleToggle()">Start</button>
+                <button class="action btn-pip" onclick="togglePiP()">PiP</button>
+                <button class="action btn-reset" onclick="handleReset()">Reset</button>
+            </div>
+        </div>
     </div>
     
     <div class="history-section">
         <h3 style="margin:0">📅 History (Last 5 Days)</h3>
         <table id="history-table">
-            <thead><tr><th>Date</th><th>Bishir</th><th>Sanjay</th><th>Krishnan</th></tr></thead>
+            <thead><tr><th>Date</th><th>Bishir</th><th>Sanjay</th><th>Krishnan</th><th>Kashi</th></tr></thead>
             <tbody id="history-body"></tbody>
         </table>
     </div>
@@ -141,13 +153,14 @@
     }
 
     let myName = localStorage.getItem('studyUser');
-    let lastEmoji = { Bishir: "", Sanjay: "", Krishnan: "" };
+    let lastEmoji = { Bishir: "", Sanjay: "", Krishnan: "", Kashi: "" };
     
-    // Added Krishnan to default state
+    // Initial State with 4 users
     let appState = { 
         Bishir: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" }, 
         Sanjay: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" }, 
         Krishnan: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" },
+        Kashi: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" },
         todayDate: new Date().toLocaleDateString('en-CA') 
     };
 
@@ -234,9 +247,10 @@
         const history = snap.val();
         if(!history) return;
         Object.values(history).sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(row => {
-            // Handle null/undefined for Krishnan in past history records
+            // Handle null for Krishnan AND Kashi in past records
             const kTime = row.Krishnan || '00:00:00';
-            hBody.innerHTML += `<tr><td>${row.date}</td><td>${row.Bishir}</td><td>${row.Sanjay}</td><td>${kTime}</td></tr>`;
+            const kashiTime = row.Kashi || '00:00:00';
+            hBody.innerHTML += `<tr><td>${row.date}</td><td>${row.Bishir}</td><td>${row.Sanjay}</td><td>${kTime}</td><td>${kashiTime}</td></tr>`;
         });
     });
 
@@ -263,33 +277,37 @@
         const historyRef = ref(db, 'history');
         const snapshot = await get(historyRef);
         let entries = snapshot.exists() ? Object.values(snapshot.val()) : [];
-        // Add Krishnan to the nightly history entry
+        
+        // Add Kashi to midnight snapshot
         entries.push({ 
             date: oldData.todayDate, 
             Bishir: fmt(oldData.Bishir.totalToday), 
             Sanjay: fmt(oldData.Sanjay.totalToday),
-            Krishnan: fmt(oldData.Krishnan.totalToday) 
+            Krishnan: fmt(oldData.Krishnan.totalToday),
+            Kashi: fmt(oldData.Kashi.totalToday)
         });
+        
         entries.sort((a,b) => new Date(b.date) - new Date(a.date));
         const pruned = {};
         entries.slice(0, 5).forEach(e => { pruned[e.date] = e; });
         
-        // Reset state for all 3 users
+        // Reset all 4 users
         update(ref(db), { 
             'history': pruned, 
             'stats': { 
                 todayDate: newDate, 
                 Bishir: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" }, 
                 Sanjay: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" },
-                Krishnan: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" }
+                Krishnan: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" },
+                Kashi: { status: 'break', totalToday: 0, startTime: 0, maxSession: 0, lastBreakAt: "" }
             } 
         });
     }
 
     function renderStatic() {
-        ['Bishir', 'Sanjay', 'Krishnan'].forEach(u => {
+        ['Bishir', 'Sanjay', 'Krishnan', 'Kashi'].forEach(u => {
             const data = appState[u];
-            if (!data) return; // Safety check
+            if (!data) return; 
             const isStudying = data.status === 'studying';
             document.getElementById(`card-${u}`).className = `card ${isStudying ? 'studying' : ''}`;
             document.getElementById(`status-${u}`).innerText = isStudying ? 'Studying' : 'On Break';
@@ -306,7 +324,7 @@
     }
 
     setInterval(() => {
-        ['Bishir', 'Sanjay', 'Krishnan'].forEach(u => {
+        ['Bishir', 'Sanjay', 'Krishnan', 'Kashi'].forEach(u => {
             if (!appState[u]) return;
             let t = appState[u].totalToday || 0;
             if(appState[u].status === 'studying' && appState[u].startTime) t += Math.floor((Date.now() - appState[u].startTime) / 1000);
