@@ -44,18 +44,23 @@
         button.action { padding: 10px 18px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; min-width: 90px; }
         .btn-toggle { background: var(--primary); color: #000; }
         .btn-focus { background: var(--accent); color: #fff; }
-        .btn-pip { background: #333; color: #fff; }
+        .btn-pip { background: #333; color: #fff; border: 1px solid #444; }
         .btn-pause-mode { background: transparent !important; border: 1px solid var(--dim) !important; color: var(--text) !important; }
         .btn-reset { background: transparent; border: 1px solid var(--red); color: var(--red); opacity: 0.6; }
         
         .history-section { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 50px; }
-        .table-wrapper { overflow-x: auto; margin-top: 15px; border: 1px solid var(--border); border-radius: 8px; }
+        .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 15px; border: 1px solid var(--border); border-radius: 8px; }
         table { width: 100%; border-collapse: collapse; min-width: 900px; }
         th, td { text-align: left; padding: 14px; border-bottom: 1px solid #2a2a2a; white-space: nowrap; }
         th { color: var(--dim); font-size: 0.75rem; text-transform: uppercase; background: #1f1f1f; }
         
+        th:first-child, td:first-child { position: sticky; left: 0; background: var(--card); z-index: 5; border-right: 2px solid var(--border); }
+        th:first-child { background: #1f1f1f; }
+        
         .hidden-card { display: none !important; }
+        /* Hidden PiP helper */
         #pip-assets { position: fixed; left: -9999px; }
+        .is-android .btn-pip { display: none !important; }
     </style>
 </head>
 <body id="main-body">
@@ -76,6 +81,7 @@
     
     <div id="history-box" class="history-section">
         <h3 style="margin:0">📅 Squad History</h3>
+        <p style="margin:5px 0 0 0; font-size:0.75rem; color:var(--dim); font-style:italic;">Swipe table left to see more users &rarr;</p>
         <div class="table-wrapper">
             <table>
                 <thead>
@@ -91,8 +97,8 @@
 </div>
 
 <div id="pip-assets">
-    <canvas id="pip-canvas" width="240" height="120"></canvas>
-    <video id="pip-video" autoplay muted playsinline></video>
+    <canvas id="pip-canvas" width="260" height="110"></canvas>
+    <video id="pip-video" muted playsinline></video>
 </div>
 
 <script type="module">
@@ -105,7 +111,7 @@
         databaseURL: "https://studytracker-92a0f-default-rtdb.firebaseio.com",
         projectId: "studytracker-92a0f",
         storageBucket: "studytracker-92a0f.firebasestorage.app",
-        messagingSenderId: "925914064669",
+        messagingSenderId: "925914064669",  
         appId: "1:925914064669:web:87a68867f5fc17b5db23f4"
     };
 
@@ -115,8 +121,15 @@
     const users = ['Bishir', 'Sanjay', 'Krishnan', 'Kashi', 'Rony', 'Sidharth'];
     let myName = localStorage.getItem('studyUser');
     let appState = { todayDate: new Date().toLocaleDateString('en-CA') };
+    let wakeLock = null;
     let focusMode = false;
+    
+    // PiP Setup
     const isAndroid = /Android/i.test(navigator.userAgent);
+    if (isAndroid) document.body.classList.add('is-android');
+    const canvas = document.getElementById('pip-canvas');
+    const ctx = canvas.getContext('2d');
+    const video = document.getElementById('pip-video');
 
     const grid = document.getElementById('user-grid');
     users.forEach(u => {
@@ -133,11 +146,20 @@
                 <div id="controls-${u}" class="controls" style="display:none">
                     <button id="toggle-${u}" class="action btn-toggle" onclick="handleToggle()">Start</button>
                     <button id="focus-${u}" class="action btn-focus" onclick="toggleFocus()">Focus</button>
-                    <button id="pip-btn-${u}" class="action btn-pip" onclick="togglePiP()" style="${isAndroid ? 'display:none' : 'display:inline-block'}">PiP</button>
+                    <button id="pip-${u}" class="action btn-pip" onclick="togglePiP()">PiP</button>
                     <button class="action btn-reset" onclick="handleReset()">Reset</button>
                 </div>
             </div>`;
     });
+
+    async function requestWakeLock() {
+        try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } 
+        catch (err) { console.warn("Wake Lock Error:", err.message); }
+    }
+
+    function releaseWakeLock() {
+        if (wakeLock !== null) { wakeLock.release().then(() => { wakeLock = null; }); }
+    }
 
     window.setIdentity = (name) => {
         myName = name; localStorage.setItem('studyUser', name);
@@ -146,41 +168,11 @@
     };
     if(myName) setIdentity(myName);
 
-    // --- PiP FIX FOR EDGE ---
-    const canvas = document.getElementById('pip-canvas');
-    const ctx = canvas.getContext('2d');
-    const video = document.getElementById('pip-video');
-
-    window.togglePiP = async () => {
-        try {
-            if (document.pictureInPictureElement) {
-                await document.exitPictureInPicture();
-            } else {
-                const stream = canvas.captureStream(30);
-                video.srcObject = stream;
-                await video.play(); // Crucial for Edge/Chrome
-                await video.requestPictureInPicture();
-            }
-        } catch (err) { console.error("PiP Error:", err); }
-    };
-
-    function updatePiP(time, emoji) {
-        if (!document.pictureInPictureElement) return;
-        ctx.fillStyle = '#181818';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#1abc9c';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.font = 'bold 45px Inter';
-        ctx.fillText(time, canvas.width / 2 - 20, canvas.height / 2);
-        ctx.font = '30px Inter';
-        ctx.fillText(emoji, canvas.width - 40, canvas.height / 2);
-    }
-
-    // ANTI-CHEAT
+    // ANTI-CHEAT (Allows PiP)
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === 'hidden') {
             const s = appState[myName];
+            // Only pause if NOT using PiP
             if (s && s.status === 'studying' && !document.pictureInPictureElement) {
                 handleToggle();
             }
@@ -194,7 +186,38 @@
         });
         document.getElementById('history-box').style.display = focusMode ? 'none' : 'block';
         document.getElementById('main-title').innerText = focusMode ? '🧘 Focus Mode' : '🗽 Liberty Squad';
+        const focusBtn = document.getElementById(`focus-${myName}`);
+        focusBtn.innerText = focusMode ? 'Show All' : 'Focus';
+        focusBtn.style.background = focusMode ? 'var(--dim)' : 'var(--accent)';
     };
+
+    // PiP LOGIC
+    window.togglePiP = async () => {
+        try {
+            if (document.pictureInPictureElement) {
+                await document.exitPictureInPicture();
+            } else {
+                // Draw initial frame
+                updatePiP('00:00:00', '🌱');
+                const stream = canvas.captureStream(30);
+                video.srcObject = stream;
+                await video.play();
+                await video.requestPictureInPicture();
+            }
+        } catch (err) { console.error("PiP Error:", err); }
+    };
+
+    function updatePiP(time, emoji) {
+        ctx.fillStyle = '#181818';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#eaeaea';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 36px Inter';
+        ctx.fillText(time, canvas.width / 2 - 20, canvas.height / 2);
+        ctx.font = '32px Inter';
+        ctx.fillText(emoji, canvas.width - 40, canvas.height / 2);
+    }
 
     onValue(ref(db, 'stats'), (snap) => {
         const data = snap.val();
@@ -219,20 +242,26 @@
 
     window.handleToggle = () => {
         const s = appState[myName];
+        const nowTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
         if (s.status === 'studying') {
+            releaseWakeLock();
             const session = Math.floor((Date.now() - s.startTime) / 1000);
             update(ref(db, `stats/${myName}`), { 
                 status: 'break', totalToday: (s.totalToday || 0) + session, 
                 maxSession: Math.max((s.maxSession || 0), session), startTime: 0,
-                lastBreakAt: `Took break at ${new Date().toLocaleTimeString()}`
+                lastBreakAt: `Took break at ${nowTime}`
             });
         } else {
+            requestWakeLock();
             update(ref(db, `stats/${myName}`), { status: 'studying', startTime: Date.now(), lastBreakAt: "" });
         }
     };
 
     window.handleReset = () => { 
-        if(confirm("Reset progress?")) update(ref(db, `stats/${myName}`), { totalToday: 0, startTime: 0, status: 'break', maxSession: 0, lastBreakAt: "" }); 
+        if(confirm("Reset today's progress?")) {
+            releaseWakeLock();
+            update(ref(db, `stats/${myName}`), { totalToday: 0, startTime: 0, status: 'break', maxSession: 0, lastBreakAt: "" }); 
+        }
     };
 
     async function runMidnightReset(oldData, newDate) {
@@ -258,7 +287,7 @@
             if(data.lastBreakAt) msgEl.innerText = data.lastBreakAt;
             if(u === myName) {
                 const btn = document.getElementById(`toggle-${u}`);
-                btn.innerText = isStudying ? "Pause" : "Start";
+                btn.innerText = isStudying ? "Pause" : (data.totalToday > 0 ? "Resume" : "Start");
                 isStudying ? btn.classList.add('btn-pause-mode') : btn.classList.remove('btn-pause-mode');
             }
         });
@@ -274,7 +303,10 @@
             const timeStr = fmt(t);
             document.getElementById(`timer-${u}`).innerText = timeStr;
             updateUIExtras(u, t);
-            if(u === myName) updatePiP(timeStr, getEmoji(t));
+            // Live PiP Update
+            if(u === myName && document.pictureInPictureElement) {
+                updatePiP(timeStr, getEmoji(t));
+            }
         });
         users.forEach(u => {
             const card = document.getElementById(`card-${u}`);
